@@ -5,19 +5,25 @@ import 'package:camera/camera.dart';
 import 'package:control_pad/control_pad.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final cameras = await availableCameras();
+  final frontCamera = cameras[1];
+
   runApp(MaterialApp(
     title: 'Flutter Demo',
     theme: ThemeData(
       primarySwatch: Colors.blue,
     ),
-    home: HomePage(),
+    home: HomePage(camera: frontCamera),
   ));
 }
 
 class HomePage extends StatefulWidget {
-  HomePage({Key key}) : super(key: key);
+  final CameraDescription camera;
   final String title = "Robopet";
+
+  const HomePage({Key key, @required this.camera}) : super(key: key);
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -33,27 +39,30 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Center(
             child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
                 margin: EdgeInsets.only(top: 15, bottom: 15),
                 constraints: BoxConstraints.tightFor(height: 50, width: 150),
                 child: ElevatedButton(
                   child: Text("Movement Control"),
                   onPressed: () {
                     Navigator.push(context,
-                          MaterialPageRoute(builder: (context) => Movement()));
+                        MaterialPageRoute(builder: (context) => Movement()));
                   },
                 )),
-              Container(
+            Container(
                 margin: EdgeInsets.only(top: 15, bottom: 15),
                 constraints: BoxConstraints.tightFor(height: 50, width: 150),
                 child: ElevatedButton(
                   child: Text("Users"),
                   onPressed: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => UsersPage()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                UsersPage(camera: widget.camera)));
                   },
                 )),
           ],
@@ -83,34 +92,101 @@ class _MovementState extends State<Movement> {
 }
 
 class UsersPage extends StatefulWidget {
-  UsersPage({Key key}) : super(key: key);
+  final CameraDescription camera;
+
+  UsersPage({Key key, @required this.camera}) : super(key: key);
   final String title = "Users";
 
   @override
   _UsersPageState createState() => _UsersPageState();
 }
 
-
-
 class _UsersPageState extends State<UsersPage> {
+  CameraController _controller;
+  Future<void> _initializeControllerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = CameraController(widget.camera, ResolutionPreset.medium);
+    _initializeControllerFuture = _controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Container(),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
+        onPressed: () {
+          _addUser();
+        },
         tooltip: 'Add user',
         child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
+    );
+  }
+
+  void _addUser() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (BuildContext context) {
+      return Scaffold(
+        appBar: AppBar(title: Text("Take picture")),
+        body: FutureBuilder<void>(
+          future: _initializeControllerFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              return CameraPreview(_controller);
+            } else {
+              return Center(child: CircularProgressIndicator());
+            }
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.camera_alt),
+          onPressed: () async {
+            try {
+              await _initializeControllerFuture;
+              final image = await _controller.takePicture();
+
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => DisplayPictureScreen(
+                            imagePath: image?.path,
+                          )));
+            } catch (e) {
+              print(e);
+            }
+          },
+        ),
+      );
+    }));
+  }
+}
+
+class DisplayPictureScreen extends StatelessWidget {
+  final String imagePath;
+
+  const DisplayPictureScreen({Key key, this.imagePath}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Display the Picture')),
+      // The image is stored as a file on the device. Use the `Image.file`
+      // constructor with the given path to display the image.
+      body: Image.file(File(imagePath)),
     );
   }
 }
