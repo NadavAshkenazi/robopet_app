@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:control_pad/control_pad.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,34 +40,37 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Center(
             child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Movement Control"),
-                  onPressed: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => Movement()));
-                  },
-                )),
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Users"),
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                UsersPage(camera: widget.camera)));
-                  },
-                )),
-          ],
-        )));
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Movement Control"),
+                      onPressed: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) => Movement()));
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Users"),
+                      onPressed: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    UsersPage(camera: widget.camera)));
+                      },
+                    )
+                ),
+              ],
+            )
+        )
+    );
   }
 }
 
@@ -91,6 +95,13 @@ class _MovementState extends State<Movement> {
   }
 }
 
+class User {
+  final String name;
+  final String uid;
+
+  User(this.name, this.uid);
+}
+
 class UsersPage extends StatefulWidget {
   final CameraDescription camera;
 
@@ -104,6 +115,9 @@ class UsersPage extends StatefulWidget {
 class _UsersPageState extends State<UsersPage> {
   CameraController _controller;
   Future<void> _initializeControllerFuture;
+  final List<User> users = [User("Asaf", "")];
+
+  TextEditingController nameController = TextEditingController();
 
   @override
   void initState() {
@@ -124,19 +138,89 @@ class _UsersPageState extends State<UsersPage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Center(
-        child: Container(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _addUser();
-        },
-        tooltip: 'Add user',
-        child: Icon(Icons.add),
+      body: Column(
+        children: <Widget>[
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'User Name',
+              ),
+            )
+          ),
+          ElevatedButton(
+            child: Text('Add'),
+            onPressed:  () {
+              _addUser();
+            },
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: users.length,
+              itemBuilder: (BuildContext context, int index) {
+                return Container(
+                  height: 50,
+                  margin: EdgeInsets.all(2),
+                  color: Colors.green,
+                  child: ElevatedButton(
+                    child: Text('${users[index].name}'),
+                    onPressed: () {},
+                  ),
+                  // child: Center(
+                  //   child: Text('${users[index].name}',
+                  //       style: TextStyle(fontSize: 18)),
+                  // )
+                );
+              },
+            )
+          )
+        ]
       ),
     );
   }
 
+  Future<String> _sendUserToRobot(String photoPath) async {
+    final String url = "http://172.31.86.139:3000/upload  ";
+    var request = http.MultipartRequest('PUT', Uri.parse(url));
+    request.files.add(
+      await http.MultipartFile.fromPath('picture', photoPath)
+    );
+
+    // Throws TimeoutException if timeout passes
+    http.Response response = await http.Response.fromStream(await request.send());
+
+    if (response.statusCode != 201) {
+      throw Exception("File transfer to robot failed");
+    } else {
+      return "1";
+    }
+  }
+
+  void _updateUsersList(String photoPath) async {
+    try {
+      var uid = await _sendUserToRobot(photoPath);
+      // setState(() {
+      //   users.insert(0, User(nameController.text, uid));
+      // });
+      Navigator.pop(context);
+      Navigator.pop(context);
+      final snackbar = SnackBar(content: Text("Success: $uid"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    } on SocketException catch (e) {
+        Navigator.pop(context);
+        Navigator.pop(context);
+        final snackbar = SnackBar(content: Text("File transfer timed out"));
+        ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    } on Exception catch (e) {
+      Navigator.pop(context);
+      Navigator.pop(context);
+      final snackbar = SnackBar(content: Text("$e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    }
+  }
   void _addUser() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (BuildContext context) {
@@ -158,13 +242,35 @@ class _UsersPageState extends State<UsersPage> {
             try {
               await _initializeControllerFuture;
               final image = await _controller.takePicture();
-
-              Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => DisplayPictureScreen(
-                            imagePath: image?.path,
-                          )));
+              Navigator.of(context)
+                  .push(
+                MaterialPageRoute(builder: (BuildContext context) {
+                  return Scaffold(
+                    appBar: AppBar(title: Text("Confirm Photo")),
+                    body: Column(
+                      children: [
+                        Image.file(File(image?.path)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                child: Text('Confirm'),
+                                onPressed: () => _updateUsersList(image.path),
+                              ),
+                            ),
+                            Expanded(
+                              child: ElevatedButton(
+                                child: Text('Cancel'),
+                                onPressed: () { Navigator.pop(context); }
+                              )
+                            ),
+                          ],
+                        )
+                      ],
+                    )
+                  );
+                })
+              );
             } catch (e) {
               print(e);
             }
@@ -172,21 +278,5 @@ class _UsersPageState extends State<UsersPage> {
         ),
       );
     }));
-  }
-}
-
-class DisplayPictureScreen extends StatelessWidget {
-  final String imagePath;
-
-  const DisplayPictureScreen({Key key, this.imagePath}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Display the Picture')),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: Image.file(File(imagePath)),
-    );
   }
 }

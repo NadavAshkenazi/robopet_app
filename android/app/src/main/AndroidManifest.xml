@@ -2,6 +2,7 @@
     package="com.iot.technion.robopet_app">
    <application
         android:label="robopet_app"
+        android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
