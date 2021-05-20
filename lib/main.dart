@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:control_pad/control_pad.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:ssh/ssh.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -82,17 +84,58 @@ class Movement extends StatefulWidget {
 }
 
 class _MovementState extends State<Movement> {
+  SSHClient client;
+
+  void initState() {
+    super.initState();
+    client = new SSHClient(
+      host: "10.0.0.4",
+      port: 22,
+      username: "asaf",
+      passwordOrKey: "",
+    );
+  }
+
+  void startSession() async {
+    //try {
+      await client.connect();
+      await client.startShell(
+        callback: (dynamic res) {
+          print(res);
+        }
+      );
+      client.writeToShell("~/tester.py\n");
+      final snackbar = SnackBar(content: Text("Connection established"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    //} //on PlatformException catch (e) {
+      // final snackbar = SnackBar(content: Text("Connection Failed: $e"));
+    //   ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    //   Navigator.pop(context);
+    // }
+  }
+
   @override
   Widget build(BuildContext context) {
+    startSession();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
       body: Center(
-        child: JoystickView(),
+        child: JoystickView(
+          interval: Duration(milliseconds: 300),
+          onDirectionChanged: (double degrees, double disFromCenter) {
+            //client.execute("echo ${degrees} >> ~/test");
+            // client.writeToShell("$degrees\n");
+            print("$degrees");
+          },
+        ),
       ),
     );
   }
+
+
 }
 
 class User {
@@ -183,7 +226,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<String> _sendUserToRobot(String photoPath) async {
-    final String url = "http://172.31.86.139:3000/upload  ";
+    final String url = "http://10.0.0.4:3000/upload";
     var request = http.MultipartRequest('PUT', Uri.parse(url));
     request.files.add(
       await http.MultipartFile.fromPath('picture', photoPath)
@@ -202,9 +245,9 @@ class _UsersPageState extends State<UsersPage> {
   void _updateUsersList(String photoPath) async {
     try {
       var uid = await _sendUserToRobot(photoPath);
-      // setState(() {
-      //   users.insert(0, User(nameController.text, uid));
-      // });
+      setState(() {
+        users.insert(0, User(nameController.text, uid));
+      });
       Navigator.pop(context);
       Navigator.pop(context);
       final snackbar = SnackBar(content: Text("Success: $uid"));
