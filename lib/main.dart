@@ -83,35 +83,46 @@ class Movement extends StatefulWidget {
 class _MovementState extends State<Movement> {
   SSHClient client;
 
+  void startSession() async {
+    try {
+      await client.connect();
+      await client.startShell(
+          ptyType: "xterm",
+          callback: (dynamic result) {
+            print(result);
+          }
+      );
+      await client.writeToShell("cd ~/robopet_be\n");
+      await client.writeToShell("./test.py\n");
+      final snackBar = SnackBar(content: Text("Connection Established"));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    } on PlatformException catch (e) {
+      final snackBar = SnackBar(content: Text("Connection failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      Navigator.pop(context);
+    }
+  }
+
   void initState() {
     super.initState();
     client = new SSHClient(
       host: "10.0.0.5",
       port: 22,
       username: "pi",
-      passwordOrKey: "robopet",
+      passwordOrKey: "***",
     );
+    startSession();
   }
 
-  void startSession() async {
-    try {
-      await client.connect();
-      await client.startShell(callback: (dynamic res) {
-        print(res);
-      });
-      client.writeToShell("~/tester.py\n");
-      final snackbar = SnackBar(content: Text("Connection established"));
-      ScaffoldMessenger.of(context).showSnackBar(snackbar);
-    } on PlatformException catch (e) {
-      final snackbar = SnackBar(content: Text("Connection Failed: $e"));
-      ScaffoldMessenger.of(context).showSnackBar(snackbar);
-      Navigator.pop(context);
-    }
+  void dispose() {
+    client.closeShell();
+    client.disconnect();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // startSession();
+   // startSession();
 
     return Scaffold(
         appBar: AppBar(
@@ -121,22 +132,25 @@ class _MovementState extends State<Movement> {
           quarterTurns: 3,
           child: Center(
             child: JoystickView(
-              interval: Duration(milliseconds: 300),
+              interval: Duration(milliseconds: 50),
               onDirectionChanged: (double degrees, double disFromCenter) {
                 //client.execute("echo ${degrees} >> ~/test");
                 // client.writeToShell("$degrees\n");
                 if (degrees <= 180) {
-                  print("$degrees");
+                  client.writeToShell("${degrees.round()}\n");
+                  print("${degrees.round()}");
                 } else {
-                  print("${-1 * (360 - degrees)}");
+                  client.writeToShell("${(-1 * (360 - degrees)).round()}\n");
+                  print("${(-1 * (360 - degrees)).round()}");
                 }
               },
             ),
           ),
         )
     );
-  }
+   }
 }
+
 
 class User {
   final String name;
