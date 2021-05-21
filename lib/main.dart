@@ -42,37 +42,34 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Center(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Movement Control"),
-                      onPressed: () {
-                        Navigator.push(context,
-                            MaterialPageRoute(builder: (context) => Movement()));
-                      },
-                    )),
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Users"),
-                      onPressed: () {
-                        Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    UsersPage(camera: widget.camera)));
-                      },
-                    )
-                ),
-              ],
-            )
-        )
-    );
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+                margin: EdgeInsets.only(top: 15, bottom: 15),
+                constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                child: ElevatedButton(
+                  child: Text("Movement Control"),
+                  onPressed: () {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => Movement()));
+                  },
+                )),
+            Container(
+                margin: EdgeInsets.only(top: 15, bottom: 15),
+                constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                child: ElevatedButton(
+                  child: Text("Users"),
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                UsersPage(camera: widget.camera)));
+                  },
+                )),
+          ],
+        )));
   }
 }
 
@@ -89,53 +86,56 @@ class _MovementState extends State<Movement> {
   void initState() {
     super.initState();
     client = new SSHClient(
-      host: "10.0.0.4",
+      host: "10.0.0.5",
       port: 22,
-      username: "asaf",
-      passwordOrKey: "",
+      username: "pi",
+      passwordOrKey: "robopet",
     );
   }
 
   void startSession() async {
-    //try {
+    try {
       await client.connect();
-      await client.startShell(
-        callback: (dynamic res) {
-          print(res);
-        }
-      );
+      await client.startShell(callback: (dynamic res) {
+        print(res);
+      });
       client.writeToShell("~/tester.py\n");
       final snackbar = SnackBar(content: Text("Connection established"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
-    //} //on PlatformException catch (e) {
-      // final snackbar = SnackBar(content: Text("Connection Failed: $e"));
-    //   ScaffoldMessenger.of(context).showSnackBar(snackbar);
-    //   Navigator.pop(context);
-    // }
+    } on PlatformException catch (e) {
+      final snackbar = SnackBar(content: Text("Connection Failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+      Navigator.pop(context);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    startSession();
+    // startSession();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: JoystickView(
-          interval: Duration(milliseconds: 300),
-          onDirectionChanged: (double degrees, double disFromCenter) {
-            //client.execute("echo ${degrees} >> ~/test");
-            // client.writeToShell("$degrees\n");
-            print("$degrees");
-          },
+        appBar: AppBar(
+          title: Text(widget.title),
         ),
-      ),
+        body: RotatedBox(
+          quarterTurns: 3,
+          child: Center(
+            child: JoystickView(
+              interval: Duration(milliseconds: 300),
+              onDirectionChanged: (double degrees, double disFromCenter) {
+                //client.execute("echo ${degrees} >> ~/test");
+                // client.writeToShell("$degrees\n");
+                if (degrees <= 180) {
+                  print("$degrees");
+                } else {
+                  print("${-1 * (360 - degrees)}");
+                }
+              },
+            ),
+          ),
+        )
     );
   }
-
-
 }
 
 class User {
@@ -181,9 +181,8 @@ class _UsersPageState extends State<UsersPage> {
       appBar: AppBar(
         title: Text(widget.title),
       ),
-      body: Column(
-        children: <Widget>[
-          Padding(
+      body: Column(children: <Widget>[
+        Padding(
             padding: EdgeInsets.all(20),
             child: TextField(
               controller: nameController,
@@ -191,49 +190,45 @@ class _UsersPageState extends State<UsersPage> {
                 border: OutlineInputBorder(),
                 labelText: 'User Name',
               ),
-            )
-          ),
-          ElevatedButton(
-            child: Text('Add'),
-            onPressed:  () {
-              _addUser();
-            },
-          ),
-          Expanded(
+            )),
+        ElevatedButton(
+          child: Text('Add'),
+          onPressed: () {
+            _addUser();
+          },
+        ),
+        Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: users.length,
-              itemBuilder: (BuildContext context, int index) {
-                return Container(
-                  height: 50,
-                  margin: EdgeInsets.all(2),
-                  color: Colors.green,
-                  child: ElevatedButton(
-                    child: Text('${users[index].name}'),
-                    onPressed: () {},
-                  ),
-                  // child: Center(
-                  //   child: Text('${users[index].name}',
-                  //       style: TextStyle(fontSize: 18)),
-                  // )
-                );
-              },
-            )
-          )
-        ]
-      ),
+          padding: const EdgeInsets.all(8),
+          itemCount: users.length,
+          itemBuilder: (BuildContext context, int index) {
+            return Container(
+              height: 50,
+              margin: EdgeInsets.all(2),
+              color: Colors.green,
+              child: ElevatedButton(
+                child: Text('${users[index].name}'),
+                onPressed: () {},
+              ),
+              // child: Center(
+              //   child: Text('${users[index].name}',
+              //       style: TextStyle(fontSize: 18)),
+              // )
+            );
+          },
+        ))
+      ]),
     );
   }
 
   Future<String> _sendUserToRobot(String photoPath) async {
     final String url = "http://10.0.0.4:3000/upload";
     var request = http.MultipartRequest('PUT', Uri.parse(url));
-    request.files.add(
-      await http.MultipartFile.fromPath('picture', photoPath)
-    );
+    request.files.add(await http.MultipartFile.fromPath('picture', photoPath));
 
     // Throws TimeoutException if timeout passes
-    http.Response response = await http.Response.fromStream(await request.send());
+    http.Response response =
+        await http.Response.fromStream(await request.send());
 
     if (response.statusCode != 201) {
       throw Exception("File transfer to robot failed");
@@ -253,10 +248,10 @@ class _UsersPageState extends State<UsersPage> {
       final snackbar = SnackBar(content: Text("Success: $uid"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
     } on SocketException catch (e) {
-        Navigator.pop(context);
-        Navigator.pop(context);
-        final snackbar = SnackBar(content: Text("File transfer timed out"));
-        ScaffoldMessenger.of(context).showSnackBar(snackbar);
+      Navigator.pop(context);
+      Navigator.pop(context);
+      final snackbar = SnackBar(content: Text("File transfer timed out"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
     } on Exception catch (e) {
       Navigator.pop(context);
       Navigator.pop(context);
@@ -264,6 +259,7 @@ class _UsersPageState extends State<UsersPage> {
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
     }
   }
+
   void _addUser() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (BuildContext context) {
@@ -286,9 +282,8 @@ class _UsersPageState extends State<UsersPage> {
               await _initializeControllerFuture;
               final image = await _controller.takePicture();
               Navigator.of(context)
-                  .push(
-                MaterialPageRoute(builder: (BuildContext context) {
-                  return Scaffold(
+                  .push(MaterialPageRoute(builder: (BuildContext context) {
+                return Scaffold(
                     appBar: AppBar(title: Text("Confirm Photo")),
                     body: Column(
                       children: [
@@ -302,18 +297,16 @@ class _UsersPageState extends State<UsersPage> {
                               ),
                             ),
                             Expanded(
-                              child: ElevatedButton(
-                                child: Text('Cancel'),
-                                onPressed: () { Navigator.pop(context); }
-                              )
-                            ),
+                                child: ElevatedButton(
+                                    child: Text('Cancel'),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                    })),
                           ],
                         )
                       ],
-                    )
-                  );
-                })
-              );
+                    ));
+              }));
             } catch (e) {
               print(e);
             }
