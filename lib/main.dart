@@ -106,10 +106,10 @@ class _MovementState extends State<Movement> {
   void initState() {
     super.initState();
     client = new SSHClient(
-      host: "10.0.0.5",
+      host: "",
       port: 22,
       username: "pi",
-      passwordOrKey: "***",
+      passwordOrKey: "",
     );
     startSession();
   }
@@ -118,6 +118,10 @@ class _MovementState extends State<Movement> {
     client.closeShell();
     client.disconnect();
     super.dispose();
+  }
+
+  int _roundDegs(double degrees, int base) {
+    return base * (degrees/base).round();
   }
 
   @override
@@ -132,16 +136,33 @@ class _MovementState extends State<Movement> {
           quarterTurns: 3,
           child: Center(
             child: JoystickView(
-              interval: Duration(milliseconds: 50),
+              interval: Duration(milliseconds: 300),
               onDirectionChanged: (double degrees, double disFromCenter) {
-                //client.execute("echo ${degrees} >> ~/test");
-                // client.writeToShell("$degrees\n");
+                var actualDegrees = 0.0;
                 if (degrees <= 180) {
-                  client.writeToShell("${degrees.round()}\n");
-                  print("${degrees.round()}");
+                  actualDegrees = 60 + (degrees / 3);
                 } else {
-                  client.writeToShell("${(-1 * (360 - degrees)).round()}\n");
-                  print("${(-1 * (360 - degrees)).round()}");
+                  actualDegrees = (degrees - 360) / 3 - 60;
+                }
+                // var base = 5;
+                // if (degrees < 60) {
+                //   actualDegrees = 60;
+                // } else if (degrees >= 60 && degrees <= 120) {
+                //   actualDegrees = degrees;
+                // } else if (degrees > 120 && degrees <= 180) {
+                //   actualDegrees = 120;
+                // } else if (degrees > 180 && degrees < 240) {
+                //   actualDegrees = -120;
+                // } else if (degrees >= 240 && degrees <= 300) {
+                //   actualDegrees = degrees - 360;
+                // } else if (degrees > 300) {
+                //   actualDegrees = -60;
+                // }
+                if (disFromCenter == 0) {
+                  client.writeToShell("0\n");
+                } else {
+                  // client.writeToShell("${_roundDegs(actualDegrees, base)}\n");
+                  client.writeToShell("${actualDegrees.round()}\n");
                 }
               },
             ),
