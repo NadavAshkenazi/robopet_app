@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:ssh/ssh.dart';
 
+const String robotIP = "10.100.102.27";
+const String httpPort = "3000";
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final cameras = await availableCameras();
@@ -39,6 +42,12 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
         appBar: AppBar(
           title: Text(widget.title),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              "assets/images/logo_cropped.png",
+            ),
+          ),
         ),
         body: Center(
             child: Column(
@@ -66,6 +75,16 @@ class _HomePageState extends State<HomePage> {
                         MaterialPageRoute(
                             builder: (context) =>
                                 UsersPage(camera: widget.camera)));
+                  },
+                )),
+            Container(
+                margin: EdgeInsets.only(top: 15, bottom: 15),
+                constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                child: ElevatedButton(
+                  child: Text("Behavior"),
+                  onPressed: () {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => BehaviorControll()));
                   },
                 )),
           ],
@@ -106,12 +125,12 @@ class _MovementState extends State<Movement> {
   void initState() {
     super.initState();
     client = new SSHClient(
-      host: "",
+      host: robotIP,
       port: 22,
       username: "pi",
-      passwordOrKey: "",
+      passwordOrKey: "robopet",
     );
-    startSession();
+    //startSession();
   }
 
   void dispose() {
@@ -120,23 +139,25 @@ class _MovementState extends State<Movement> {
     super.dispose();
   }
 
-  int _roundDegs(double degrees, int base) {
-    return base * (degrees/base).round();
-  }
-
   @override
   Widget build(BuildContext context) {
-   // startSession();
+    startSession();
 
     return Scaffold(
         appBar: AppBar(
           title: Text(widget.title),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              "assets/images/logo_cropped.png",
+            ),
+          ),
         ),
         body: RotatedBox(
           quarterTurns: 3,
           child: Center(
             child: JoystickView(
-              interval: Duration(milliseconds: 300),
+              interval: Duration(milliseconds: 1000),
               onDirectionChanged: (double degrees, double disFromCenter) {
                 var actualDegrees = 0.0;
                 if (degrees <= 180) {
@@ -144,24 +165,9 @@ class _MovementState extends State<Movement> {
                 } else {
                   actualDegrees = (degrees - 360) / 3 - 60;
                 }
-                // var base = 5;
-                // if (degrees < 60) {
-                //   actualDegrees = 60;
-                // } else if (degrees >= 60 && degrees <= 120) {
-                //   actualDegrees = degrees;
-                // } else if (degrees > 120 && degrees <= 180) {
-                //   actualDegrees = 120;
-                // } else if (degrees > 180 && degrees < 240) {
-                //   actualDegrees = -120;
-                // } else if (degrees >= 240 && degrees <= 300) {
-                //   actualDegrees = degrees - 360;
-                // } else if (degrees > 300) {
-                //   actualDegrees = -60;
-                // }
                 if (disFromCenter == 0) {
                   client.writeToShell("0\n");
                 } else {
-                  // client.writeToShell("${_roundDegs(actualDegrees, base)}\n");
                   client.writeToShell("${actualDegrees.round()}\n");
                 }
               },
@@ -193,6 +199,7 @@ class UsersPage extends StatefulWidget {
 class _UsersPageState extends State<UsersPage> {
   CameraController _controller;
   Future<void> _initializeControllerFuture;
+  bool recording = false;
   final List<User> users = [User("Asaf", "")];
 
   TextEditingController nameController = TextEditingController();
@@ -215,6 +222,12 @@ class _UsersPageState extends State<UsersPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Image.asset(
+            "assets/images/logo_cropped.png",
+          ),
+        ),
       ),
       body: Column(children: <Widget>[
         Padding(
@@ -257,9 +270,10 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Future<String> _sendUserToRobot(String photoPath) async {
-    final String url = "http://10.0.0.4:3000/upload";
+    final String url = "http://$robotIP:$httpPort/upload";
     var request = http.MultipartRequest('PUT', Uri.parse(url));
-    request.files.add(await http.MultipartFile.fromPath('picture', photoPath));
+    request.fields['user'] = "Hello";
+    request.files.add(await http.MultipartFile.fromPath('video', photoPath));
 
     // Throws TimeoutException if timeout passes
     http.Response response =
@@ -278,7 +292,6 @@ class _UsersPageState extends State<UsersPage> {
       setState(() {
         users.insert(0, User(nameController.text, uid));
       });
-      Navigator.pop(context);
       Navigator.pop(context);
       final snackbar = SnackBar(content: Text("Success: $uid"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
@@ -311,37 +324,22 @@ class _UsersPageState extends State<UsersPage> {
           },
         ),
         floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.camera_alt),
+          child: Icon(Icons.videocam),
           onPressed: () async {
             try {
-              await _initializeControllerFuture;
-              final image = await _controller.takePicture();
-              Navigator.of(context)
-                  .push(MaterialPageRoute(builder: (BuildContext context) {
-                return Scaffold(
-                    appBar: AppBar(title: Text("Confirm Photo")),
-                    body: Column(
-                      children: [
-                        Image.file(File(image?.path)),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                child: Text('Confirm'),
-                                onPressed: () => _updateUsersList(image.path),
-                              ),
-                            ),
-                            Expanded(
-                                child: ElevatedButton(
-                                    child: Text('Cancel'),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                    })),
-                          ],
-                        )
-                      ],
-                    ));
-              }));
+              if (!recording) {
+                await _initializeControllerFuture;
+                await _controller.startVideoRecording();
+                setState(() {
+                  recording = true;
+                });
+              } else {
+                final video = await _controller.stopVideoRecording();
+                _updateUsersList(video.path);
+                setState(() {
+                  recording = false;
+                });
+              }
             } catch (e) {
               print(e);
             }
@@ -351,3 +349,89 @@ class _UsersPageState extends State<UsersPage> {
     }));
   }
 }
+
+class BehaviorControll extends StatelessWidget  {
+  final String title = "Behaviors";
+
+  void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {
+    final String url = "http://$robotIP:$httpPort/$behvaior";
+    var request = http.Request('PUT', Uri.parse(url));
+    try {
+      var response = await request.send();
+      if (response.statusCode == 204) {
+        final snackbar = SnackBar(content: Text("Behvaior request accepted: $behvaior"));
+        ScaffoldMessenger.of(context).showSnackBar(snackbar);
+      }
+      else {
+        throw Exception("Bad status code: ${response.statusCode}");
+      }
+    } on Exception catch (e) {
+      final snackbar = SnackBar(content: Text("Behvaior request failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          // title: Padding(
+          //   padding: const EdgeInsets.all(8.0),
+          //   child: Image.asset(
+          //     "assets/images/title.jpeg",
+          //   ),
+          // ),
+          title: Text(title),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+            "assets/images/logo_cropped.png",
+            ),
+          ),
+        ),
+        body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Friendly"),
+                      onPressed: () {
+                       _sendHttpBehaviorReq("friendly", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Hostile"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("hostile", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Follow"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("follow", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Sleep"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("sleep", context);
+                      },
+                    ))
+              ],
+            )));
+  }
+}
+
