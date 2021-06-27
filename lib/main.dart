@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:camera/camera.dart';
 import 'package:control_pad/control_pad.dart';
@@ -8,8 +9,38 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:ssh/ssh.dart';
 
-const String robotIP = "10.100.102.27";
+const String robotIP = "192.168.2.1";
 const String httpPort = "3000";
+
+class Dialogs {
+  static Future<void> showLoadingDialog(
+      BuildContext context, GlobalKey key) async {
+    return showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return new WillPopScope(
+              onWillPop: () async => false,
+              child: SimpleDialog(
+                  key: key,
+                  backgroundColor: Colors.black54,
+                  children: <Widget>[
+                    Center(
+                      child: Column(children: [
+                        CircularProgressIndicator(),
+                        SizedBox(height: 10,),
+                        Text("Please Wait....",style: TextStyle(color: Colors.blueAccent),)
+                      ]),
+                    )
+                  ]));
+        });
+  }
+}
+
+class OpenCVException implements Exception {
+  final String cause;
+  OpenCVException(this.cause);
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -84,7 +115,7 @@ class _HomePageState extends State<HomePage> {
                   child: Text("Behavior"),
                   onPressed: () {
                     Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => BehaviorControll()));
+                        MaterialPageRoute(builder: (context) => BehaviorControl()));
                   },
                 )),
           ],
@@ -112,7 +143,7 @@ class _MovementState extends State<Movement> {
           }
       );
       await client.writeToShell("cd ~/robopet_be\n");
-      await client.writeToShell("./test.py\n");
+      await client.writeToShell("./movement.py\n");
       final snackBar = SnackBar(content: Text("Connection Established"));
       ScaffoldMessenger.of(context).showSnackBar(snackBar);
     } on PlatformException catch (e) {
@@ -139,6 +170,20 @@ class _MovementState extends State<Movement> {
     super.dispose();
   }
 
+  void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {
+    final String url = "http://$robotIP:$httpPort/$behvaior";
+    var request = http.Request('PUT', Uri.parse(url));
+    try {
+      var response = await request.send();
+      if (response.statusCode != 204) {
+        throw Exception("Bad status code: ${response.statusCode}");
+      }
+    } on Exception catch (e) {
+      final snackbar = SnackBar(content: Text("Behvaior request failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     startSession();
@@ -153,27 +198,66 @@ class _MovementState extends State<Movement> {
             ),
           ),
         ),
-        body: RotatedBox(
-          quarterTurns: 3,
-          child: Center(
-            child: JoystickView(
-              interval: Duration(milliseconds: 1000),
-              onDirectionChanged: (double degrees, double disFromCenter) {
-                var actualDegrees = 0.0;
-                if (degrees <= 180) {
-                  actualDegrees = 60 + (degrees / 3);
-                } else {
-                  actualDegrees = (degrees - 360) / 3 - 60;
-                }
-                if (disFromCenter == 0) {
-                  client.writeToShell("0\n");
-                } else {
-                  client.writeToShell("${actualDegrees.round()}\n");
-                }
-              },
+        body: Column(children: <Widget>[
+          Expanded(
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: Center(
+                child: JoystickView(
+                  interval: Duration(milliseconds: 300),
+                  onDirectionChanged: (double degrees, double disFromCenter) {
+                    var actualDegrees = 0.0;
+                    if (degrees <= 180) {
+                      actualDegrees = 60 + (degrees / 3);
+                    } else {
+                      actualDegrees = (degrees - 360) / 3 - 60;
+                    }
+                    if (disFromCenter == 0) {
+                      client.writeToShell("0\n");
+                    } else {
+                      client.writeToShell("${actualDegrees.round()}\n");
+                    }
+                  },
+                ),
+              ),
             ),
           ),
-        )
+          Row(children: [
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Spin"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("spin", context);
+                    },
+                  )),
+            ),
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Wag tail"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("wag", context);
+                    },
+                  )),
+            ),
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Bark"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("bark", context);
+                    },
+                  )),
+            ),
+          ],)
+        ],)
     );
    }
 }
@@ -201,6 +285,8 @@ class _UsersPageState extends State<UsersPage> {
   Future<void> _initializeControllerFuture;
   bool recording = false;
   final List<User> users = [User("Asaf", "")];
+  final Map<String, String> users_map = {};
+  final GlobalKey<State> _keyLoader = new GlobalKey<State>();
 
   TextEditingController nameController = TextEditingController();
 
@@ -215,6 +301,12 @@ class _UsersPageState extends State<UsersPage> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void getUsersMap() async {
+    final String url = "http://$robotIP:$httpPort/download_users";
+    final response =
+        await http.get(Uri.parse(url));
   }
 
   @override
@@ -240,9 +332,19 @@ class _UsersPageState extends State<UsersPage> {
               ),
             )),
         ElevatedButton(
-          child: Text('Add'),
+          child: Text('Take video from phone'),
           onPressed: () {
-            _addUser();
+            if (nameController.text != "") {
+              _recordVideo();
+            }
+          },
+        ),
+        ElevatedButton(
+          child: Text('Let robopet look at you'),
+          onPressed: () {
+            if (nameController.text != "") {
+              _addUser("", "robot");
+            }
           },
         ),
         Expanded(
@@ -269,50 +371,102 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Future<String> _sendUserToRobot(String photoPath) async {
+  Future<void> _sendUserToRobot(String photoPath) async {
     final String url = "http://$robotIP:$httpPort/upload";
     var request = http.MultipartRequest('PUT', Uri.parse(url));
-    request.fields['user'] = "Hello";
+    request.fields['user'] = nameController.text;
     request.files.add(await http.MultipartFile.fromPath('video', photoPath));
 
     // Throws TimeoutException if timeout passes
     http.Response response =
         await http.Response.fromStream(await request.send());
 
-    if (response.statusCode != 201) {
+    if (response.statusCode == 422) {
+      throw OpenCVException("Record again");
+    } else if (response.statusCode != 201) {
       throw Exception("File transfer to robot failed");
-    } else {
-      return "1";
     }
   }
 
-  void _updateUsersList(String photoPath) async {
+  Future<void> _recordFromRobot() async {
+    final String url = "http://$robotIP:$httpPort/take_video";
+    final response = await http.put(
+        Uri.parse(url),
+        body: { "user": nameController.text}
+    );
+
+    if (response.statusCode == 422) {
+      throw OpenCVException("Robot couldn't take a good look at you");
+    } else if (response.statusCode != 201) {
+      throw Exception("Rquest failed");
+    }
+  }
+
+
+  Future<void> _showAgainDialog() async {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false, // user must tap button!
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Insufficient Video'),
+          content: SingleChildScrollView(
+            child: ListBody(
+              children: const <Widget>[
+                Text("Robopet failed to learn your face"),
+                Text('Please try again.'),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _addUser(String photoPath, String camera) async {
     try {
-      var uid = await _sendUserToRobot(photoPath);
-      setState(() {
-        users.insert(0, User(nameController.text, uid));
-      });
-      Navigator.pop(context);
-      final snackbar = SnackBar(content: Text("Success: $uid"));
+      Dialogs.showLoadingDialog(context, _keyLoader);
+      if (camera == 'phone') {
+        await _sendUserToRobot(photoPath);
+      } else {
+        await _recordFromRobot();
+      }
+      Navigator.of(_keyLoader.currentContext).pop();
+      final snackbar = SnackBar(content: Text("Success"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    } on OpenCVException catch (e) {
+      Navigator.of(_keyLoader.currentContext).pop();
+      _showAgainDialog();
     } on SocketException catch (e) {
-      Navigator.pop(context);
+      Navigator.of(_keyLoader.currentContext).pop();
       Navigator.pop(context);
       final snackbar = SnackBar(content: Text("File transfer timed out"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
     } on Exception catch (e) {
-      Navigator.pop(context);
+      Navigator.of(_keyLoader.currentContext).pop();
       Navigator.pop(context);
       final snackbar = SnackBar(content: Text("$e"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    } finally {
+      if (camera == 'phone') {
+        Navigator.pop(context);
+      }
     }
   }
 
-  void _addUser() {
+  void _recordVideo() {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (BuildContext context) {
       return Scaffold(
-        appBar: AppBar(title: Text("Take picture")),
+        appBar: AppBar(title: Text("Take video")),
         body: FutureBuilder<void>(
           future: _initializeControllerFuture,
           builder: (context, snapshot) {
@@ -335,7 +489,7 @@ class _UsersPageState extends State<UsersPage> {
                 });
               } else {
                 final video = await _controller.stopVideoRecording();
-                _updateUsersList(video.path);
+                _addUser(video.path, "phone");
                 setState(() {
                   recording = false;
                 });
@@ -350,7 +504,7 @@ class _UsersPageState extends State<UsersPage> {
   }
 }
 
-class BehaviorControll extends StatelessWidget  {
+class BehaviorControl extends StatelessWidget  {
   final String title = "Behaviors";
 
   void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {

@@ -1,9 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.iot.technion.robopet_app">
-   <application
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <application
         android:label="robopet_app"
         android:usesCleartextTraffic="true"
-        android:icon="@mipmap/ic_launcher">
+        android:requestLegacyExternalStorage="true"
+       android:icon="@mipmap/launcher_icon">
         <activity
             android:name=".MainActivity"
             android:launchMode="singleTop"
