@@ -49,6 +49,7 @@ Future<void> main() async {
 
   runApp(MaterialApp(
     title: 'Flutter Demo',
+    debugShowCheckedModeBanner: false,
     theme: ThemeData(
       primarySwatch: Colors.blue,
     ),
@@ -93,6 +94,16 @@ class _HomePageState extends State<HomePage> {
                   onPressed: () {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (context) => Movement()));
+                  },
+                )),
+            Container(
+                margin: EdgeInsets.only(top: 15, bottom: 15),
+                constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                child: ElevatedButton(
+                  child: Text("Head Control"),
+                  onPressed: () {
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (context) => HeadMovement()));
                   },
                 )),
             Container(
@@ -262,6 +273,138 @@ class _MovementState extends State<Movement> {
    }
 }
 
+class HeadMovement extends StatefulWidget {
+  final String title = "Robopet Head Movement Control";
+
+  @override
+  _HeadMovementState createState() => _HeadMovementState();
+}
+
+class _HeadMovementState extends State<HeadMovement> {
+  SSHClient client;
+
+  void startSession() async {
+    try {
+      await client.connect();
+      await client.startShell(
+          ptyType: "xterm",
+          callback: (dynamic result) {
+            print(result);
+          }
+      );
+      await client.writeToShell("cd ~/robopet_be\n");
+      await client.writeToShell("./headMovement.py\n");
+      final snackBar = SnackBar(content: Text("Connection Established"));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+    } on PlatformException catch (e) {
+      final snackBar = SnackBar(content: Text("Connection failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      Navigator.pop(context);
+    }
+  }
+
+  void initState() {
+    super.initState();
+    client = new SSHClient(
+      host: robotIP,
+      port: 22,
+      username: "pi",
+      passwordOrKey: "robopet",
+    );
+    //startSession();
+  }
+
+  void dispose() {
+    client.closeShell();
+    client.disconnect();
+    super.dispose();
+  }
+
+  void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {
+    final String url = "http://$robotIP:$httpPort/$behvaior";
+    var request = http.Request('PUT', Uri.parse(url));
+    try {
+      var response = await request.send();
+      if (response.statusCode != 204) {
+        throw Exception("Bad status code: ${response.statusCode}");
+      }
+    } on Exception catch (e) {
+      final snackbar = SnackBar(content: Text("Behvaior request failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    startSession();
+
+    return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              "assets/images/logo_cropped.png",
+            ),
+          ),
+        ),
+        body: Column(children: <Widget>[
+          Expanded(
+            child: RotatedBox(
+              quarterTurns: 0,
+              child: Center(
+                child: JoystickView(
+                  interval: Duration(milliseconds: 300),
+                  onDirectionChanged: (double degrees, double disFromCenter) {
+                    if (disFromCenter == 0) {
+                      client.writeToShell("0\n");
+                    } else {
+                      client.writeToShell("${degrees.round()}\n");
+                    }
+                  },
+                ),
+              ),
+            ),
+          ),
+          Row(children: [
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Spin"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("spin", context);
+                    },
+                  )),
+            ),
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Wag tail"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("wag", context);
+                    },
+                  )),
+            ),
+            Expanded(
+              child: Container(
+                  margin: EdgeInsets.only(top: 15, bottom: 15),
+                  constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                  child: ElevatedButton(
+                    child: Text("Bark"),
+                    onPressed: () {
+                      _sendHttpBehaviorReq("bark", context);
+                    },
+                  )),
+            ),
+          ],)
+        ],)
+    );
+  }
+}
 
 class User {
   final String name;
@@ -442,10 +585,10 @@ class _UsersPageState extends State<UsersPage> {
       Navigator.of(_keyLoader.currentContext).pop();
       final snackbar = SnackBar(content: Text("Success"));
       ScaffoldMessenger.of(context).showSnackBar(snackbar);
-    } on OpenCVException catch (e) {
+    } on OpenCVException {
       Navigator.of(_keyLoader.currentContext).pop();
       _showAgainDialog();
-    } on SocketException catch (e) {
+    } on SocketException {
       Navigator.of(_keyLoader.currentContext).pop();
       Navigator.pop(context);
       final snackbar = SnackBar(content: Text("File transfer timed out"));
