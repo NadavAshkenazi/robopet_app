@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:ssh/ssh.dart';
 
-const String robotIP = "10.0.0.5";
+const String robotIP = "192.168.2.1";
 const String httpPort = "3000";
 
 class Dialogs {
@@ -218,7 +218,7 @@ class _MovementState extends State<Movement> {
                       actualDegrees = (degrees - 360) / 3 - 60;
                     }
                     if (disFromCenter == 0) {
-                      client.writeToShell("0\n");
+                      client.writeToShell("stop\n");
                     } else {
                       client.writeToShell("${actualDegrees.round()}\n");
                     }
