@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:ssh/ssh.dart';
 
-const String robotIP = "192.168.2.1";
+const String robotIP = "10.0.0.5";
 const String httpPort = "3000";
 
 class Dialogs {
@@ -57,23 +57,17 @@ Future<void> main() async {
   ));
 }
 
-class HomePage extends StatefulWidget {
+class HomePage extends StatelessWidget {
   final CameraDescription camera;
   final String title = "Robopet";
 
   const HomePage({Key key, @required this.camera}) : super(key: key);
 
   @override
-  _HomePageState createState() => _HomePageState();
-}
-
-// Should preserve state - is logged in?
-class _HomePageState extends State<HomePage> {
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: Text(widget.title),
+          title: Text(title),
           leading: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Image.asset(
@@ -83,54 +77,54 @@ class _HomePageState extends State<HomePage> {
         ),
         body: Center(
             child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Movement Control"),
-                  onPressed: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => Movement()));
-                  },
-                )),
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Head Control"),
-                  onPressed: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => HeadMovement()));
-                  },
-                )),
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Users"),
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) =>
-                                UsersPage(camera: widget.camera)));
-                  },
-                )),
-            Container(
-                margin: EdgeInsets.only(top: 15, bottom: 15),
-                constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                child: ElevatedButton(
-                  child: Text("Behavior"),
-                  onPressed: () {
-                    Navigator.push(context,
-                        MaterialPageRoute(builder: (context) => BehaviorControl()));
-                  },
-                )),
-          ],
-        )));
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Movement Control"),
+                      onPressed: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) => Movement()));
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Head Control"),
+                      onPressed: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) => HeadMovement()));
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Users"),
+                      onPressed: () {
+                        Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    UsersPage(camera: camera)));
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Behavior"),
+                      onPressed: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (context) => BehaviorControl()));
+                      },
+                    )),
+              ],
+            )));
   }
 }
 
@@ -731,4 +725,5 @@ class BehaviorControl extends StatelessWidget  {
             )));
   }
 }
+
 
