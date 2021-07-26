@@ -400,13 +400,6 @@ class _HeadMovementState extends State<HeadMovement> {
   }
 }
 
-class User {
-  final String name;
-  final String uid;
-
-  User(this.name, this.uid);
-}
-
 class UsersPage extends StatefulWidget {
   final CameraDescription camera;
 
@@ -421,8 +414,6 @@ class _UsersPageState extends State<UsersPage> {
   CameraController _controller;
   Future<void> _initializeControllerFuture;
   bool recording = false;
-  final List<User> users = [User("Asaf", "")];
-  final Map<String, String> users_map = {};
   final GlobalKey<State> _keyLoader = new GlobalKey<State>();
 
   TextEditingController nameController = TextEditingController();
@@ -440,10 +431,19 @@ class _UsersPageState extends State<UsersPage> {
     super.dispose();
   }
 
-  void getUsersMap() async {
-    final String url = "http://$robotIP:$httpPort/download_users";
-    final response =
-        await http.get(Uri.parse(url));
+  Future<List<String>> getUsersList() async {
+    final response = await http
+        .get(Uri.parse("http://$robotIP:$httpPort/get_users"));
+    if (response.statusCode == 200) {
+      var parsedMap = json.decode(response.body);
+      var users = <String>[];
+      parsedMap.values.forEach((username) {
+        users.add(username);
+      });
+      return users;
+    } else {
+      throw Exception("Failed getting users: ${response.statusCode}");
+    }
   }
 
   @override
@@ -485,25 +485,30 @@ class _UsersPageState extends State<UsersPage> {
           },
         ),
         Expanded(
-            child: ListView.builder(
-          padding: const EdgeInsets.all(8),
-          itemCount: users.length,
-          itemBuilder: (BuildContext context, int index) {
-            return Container(
-              height: 50,
-              margin: EdgeInsets.all(2),
-              color: Colors.green,
-              child: ElevatedButton(
-                child: Text('${users[index].name}'),
-                onPressed: () {},
-              ),
-              // child: Center(
-              //   child: Text('${users[index].name}',
-              //       style: TextStyle(fontSize: 18)),
-              // )
-            );
-          },
-        ))
+            child: FutureBuilder(
+                future: getUsersList(),
+                builder: (BuildContext context,
+                    AsyncSnapshot<List<String>> snapshot) {
+                  if (snapshot.hasData) {
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(8),
+                      itemCount: snapshot.data.length,
+                      itemBuilder: (BuildContext context, int index) => Container(
+                        height: 50,
+                        margin: EdgeInsets.all(2),
+                        color: Colors.green,
+                        child: ElevatedButton(
+                          child: Text("${snapshot.data[index]}"),
+                          onPressed: () {},
+                        ),
+                      ),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text("Error: ${snapshot.error}");
+                  } else {
+                    return Text("Loading....");
+                  }
+                })),
       ]),
     );
   }
