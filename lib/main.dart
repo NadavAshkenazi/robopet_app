@@ -400,6 +400,91 @@ class _HeadMovementState extends State<HeadMovement> {
   }
 }
 
+class BehaviorControl extends StatelessWidget  {
+  final String title = "Behaviors";
+
+  void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {
+    final String url = "http://$robotIP:$httpPort/$behvaior";
+    var request = http.Request('PUT', Uri.parse(url));
+    try {
+      var response = await request.send();
+      if (response.statusCode == 204) {
+        final snackbar = SnackBar(content: Text("Behvaior request accepted: $behvaior"));
+        ScaffoldMessenger.of(context).showSnackBar(snackbar);
+      }
+      else {
+        throw Exception("Bad status code: ${response.statusCode}");
+      }
+    } on Exception catch (e) {
+      final snackbar = SnackBar(content: Text("Behvaior request failed: $e"));
+      ScaffoldMessenger.of(context).showSnackBar(snackbar);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          // title: Padding(
+          //   padding: const EdgeInsets.all(8.0),
+          //   child: Image.asset(
+          //     "assets/images/title.jpeg",
+          //   ),
+          // ),
+          title: Text(title),
+          leading: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Image.asset(
+              "assets/images/logo_cropped.png",
+            ),
+          ),
+        ),
+        body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Friendly"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("friendly", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Hostile"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("hostile", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Follow"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("follow", context);
+                      },
+                    )),
+                Container(
+                    margin: EdgeInsets.only(top: 15, bottom: 15),
+                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
+                    child: ElevatedButton(
+                      child: Text("Sleep"),
+                      onPressed: () {
+                        _sendHttpBehaviorReq("sleep", context);
+                      },
+                    ))
+              ],
+            )));
+  }
+}
+
 class UsersPage extends StatefulWidget {
   final CameraDescription camera;
 
@@ -446,6 +531,67 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  void _createUser() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+      builder: (BuildContext context) {
+        return Scaffold(
+          appBar: AppBar(title: Text("Take Picture")),
+          body: FutureBuilder<void>(
+            future: _initializeControllerFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.done) {
+                return CameraPreview(_controller);
+              } else {
+                return Center(child: CircularProgressIndicator());
+              }
+            },
+          ),
+        floatingActionButton: FloatingActionButton(
+          child: Icon(Icons.camera_alt),
+          onPressed: () async {
+            try {
+              await _initializeControllerFuture;
+              final image = await _controller.takePicture();
+              Navigator.of(context)
+              .push(MaterialPageRoute(
+                builder: (BuildContext context) {
+                  return Scaffold(
+                    appBar: AppBar(title: Text("Confirm image")),
+                    body: Column(
+                      children: [
+                        Image.file(File(image.path)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                child: Text("Confirm"),
+                                onPressed: () => _addUser(image.path)
+                              )
+                            ),
+                            Expanded(
+                                child: ElevatedButton(
+                                  child: Text("Cancel"),
+                                  onPressed: () => Navigator.pop(context),
+                                )
+                            )
+                          ],
+                        )
+                      ]
+                    )
+                  );
+                }
+              ));
+            } catch(e) {
+              print(e);
+            }
+          },
+        ),
+        );
+      }
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -469,21 +615,21 @@ class _UsersPageState extends State<UsersPage> {
               ),
             )),
         ElevatedButton(
-          child: Text('Take video from phone'),
+          child: Text('Take photo from phone'),
           onPressed: () {
             if (nameController.text != "") {
-              _recordVideo();
+              _createUser();
             }
           },
         ),
-        ElevatedButton(
-          child: Text('Let robopet look at you'),
-          onPressed: () {
-            if (nameController.text != "") {
-              _addUser("", "robot");
-            }
-          },
-        ),
+        // ElevatedButton(
+        //   child: Text('Let robopet look at you'),
+        //   onPressed: () {
+        //     if (nameController.text != "") {
+        //       _addUser("", "robot");
+        //     }
+        //   },
+        // ),
         Expanded(
             child: FutureBuilder(
                 future: getUsersList(),
@@ -517,7 +663,7 @@ class _UsersPageState extends State<UsersPage> {
     final String url = "http://$robotIP:$httpPort/upload";
     var request = http.MultipartRequest('PUT', Uri.parse(url));
     request.fields['user'] = nameController.text;
-    request.files.add(await http.MultipartFile.fromPath('video', photoPath));
+    request.files.add(await http.MultipartFile.fromPath('photo', photoPath));
 
     // Throws TimeoutException if timeout passes
     http.Response response =
@@ -612,7 +758,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  void _addUser(String photoPath, String camera) async {
+  void _addUser(String photoPath, [String camera = 'phone']) async {
     try {
       Dialogs.showLoadingDialog(context, _keyLoader);
       if (camera == 'phone') {
@@ -660,22 +806,11 @@ class _UsersPageState extends State<UsersPage> {
           },
         ),
         floatingActionButton: FloatingActionButton(
-          child: Icon(Icons.videocam),
+          child: Icon(Icons.camera_alt),
           onPressed: () async {
             try {
-              if (!recording) {
-                await _initializeControllerFuture;
-                await _controller.startVideoRecording();
-                setState(() {
-                  recording = true;
-                });
-              } else {
-                final video = await _controller.stopVideoRecording();
-                _addUser(video.path, "phone");
-                setState(() {
-                  recording = false;
-                });
-              }
+              await _initializeControllerFuture;
+              final image = await _controller.takePicture();
             } catch (e) {
               print(e);
             }
@@ -685,90 +820,3 @@ class _UsersPageState extends State<UsersPage> {
     }));
   }
 }
-
-class BehaviorControl extends StatelessWidget  {
-  final String title = "Behaviors";
-
-  void _sendHttpBehaviorReq(String behvaior, BuildContext context) async {
-    final String url = "http://$robotIP:$httpPort/$behvaior";
-    var request = http.Request('PUT', Uri.parse(url));
-    try {
-      var response = await request.send();
-      if (response.statusCode == 204) {
-        final snackbar = SnackBar(content: Text("Behvaior request accepted: $behvaior"));
-        ScaffoldMessenger.of(context).showSnackBar(snackbar);
-      }
-      else {
-        throw Exception("Bad status code: ${response.statusCode}");
-      }
-    } on Exception catch (e) {
-      final snackbar = SnackBar(content: Text("Behvaior request failed: $e"));
-      ScaffoldMessenger.of(context).showSnackBar(snackbar);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        appBar: AppBar(
-          // title: Padding(
-          //   padding: const EdgeInsets.all(8.0),
-          //   child: Image.asset(
-          //     "assets/images/title.jpeg",
-          //   ),
-          // ),
-          title: Text(title),
-          leading: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Image.asset(
-            "assets/images/logo_cropped.png",
-            ),
-          ),
-        ),
-        body: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Friendly"),
-                      onPressed: () {
-                       _sendHttpBehaviorReq("friendly", context);
-                      },
-                    )),
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Hostile"),
-                      onPressed: () {
-                        _sendHttpBehaviorReq("hostile", context);
-                      },
-                    )),
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Follow"),
-                      onPressed: () {
-                        _sendHttpBehaviorReq("follow", context);
-                      },
-                    )),
-                Container(
-                    margin: EdgeInsets.only(top: 15, bottom: 15),
-                    constraints: BoxConstraints.tightFor(height: 50, width: 150),
-                    child: ElevatedButton(
-                      child: Text("Sleep"),
-                      onPressed: () {
-                        _sendHttpBehaviorReq("sleep", context);
-                      },
-                    ))
-              ],
-            )));
-  }
-}
-
-
