@@ -499,7 +499,7 @@ class _UsersPageState extends State<UsersPage> {
                         color: Colors.green,
                         child: ElevatedButton(
                           child: Text("${snapshot.data[index]}"),
-                          onPressed: () {},
+                          onPressed: () => _showRemoveUserDiaglog(snapshot.data[index]),
                         ),
                       ),
                     );
@@ -544,6 +544,45 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  Future<void> _removeUser(String username) async{
+    final String url = "http://$robotIP:$httpPort/remove_user";
+    var request = http.MultipartRequest('PUT', Uri.parse(url));
+    request.fields['user'] = username;
+
+    // Throws TimeoutException if timeout passes
+    http.Response response =
+    await http.Response.fromStream(await request.send());
+
+    if (response.statusCode != 201) {
+      throw Exception("User removal failed for user $username");
+    }
+  }
+
+  Future<void> _showRemoveUserDiaglog(String username) async {
+    Widget cancelButton = TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text("Cancel")
+    );
+
+    Widget confirmButton = TextButton(
+        onPressed: () => _removeUser(username),
+        child: Text("Confirm")
+    );
+
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text("Remove owner $username"),
+            content: Text("You are about to remove $username as an owner of robopet."),
+            actions: [
+              cancelButton,
+              confirmButton,
+            ],
+          );
+        }
+    );
+  }
 
   Future<void> _showAgainDialog() async {
     return showDialog<void>(
@@ -601,6 +640,7 @@ class _UsersPageState extends State<UsersPage> {
       if (camera == 'phone') {
         Navigator.pop(context);
       }
+      setState(() => {});
     }
   }
 
