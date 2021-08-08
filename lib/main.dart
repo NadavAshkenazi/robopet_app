@@ -645,7 +645,10 @@ class _UsersPageState extends State<UsersPage> {
                         color: Colors.green,
                         child: ElevatedButton(
                           child: Text("${snapshot.data[index]}"),
-                          onPressed: () => _showRemoveUserDiaglog(snapshot.data[index]),
+                          onPressed: () {
+                            _showRemoveUserDiaglog(snapshot.data[index]);
+                            setState(() {});
+                          },
                         ),
                       ),
                     );
@@ -711,7 +714,10 @@ class _UsersPageState extends State<UsersPage> {
     );
 
     Widget confirmButton = TextButton(
-        onPressed: () => _removeUser(username),
+        onPressed: () {
+          _removeUser(username);
+          Navigator.of(context).pop();
+        },
         child: Text("Confirm")
     );
 
